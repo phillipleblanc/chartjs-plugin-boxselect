@@ -1,5 +1,5 @@
 {
-  "name": "@spiceai/chartjs-plugin-boxselect",
+  "name": "@phillipleblanc/chartjs-plugin-boxselect",
   "version": "1.0.6-dev01",
   "description": "Chart.js plugin to select points on a chart with a click-and-drag box",
   "author": "Thomas Humphries",
