@@ -1,249 +1,257 @@
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('chart.js')) :
-	typeof define === 'function' && define.amd ? define(['chart.js'], factory) :
-	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.boxselectplugin = factory(global.Chart));
-}(this, (function (Chart) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory(require('chart.js/helpers')) :
+  typeof define === 'function' && define.amd ? define(['chart.js/helpers'], factory) :
+  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.boxselectplugin = factory(global.helpers));
+}(this, (function (helpers) { 'use strict';
 
-	function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+  var defaultOptions = {
+    select: {
+      enabled: true,
+      direction: "xy",
+      selectboxBackgroundColor: "rgba(66,133,244,0.2)",
+      selectboxBorderColor: "#48F",
+    },
+    callbacks: {
+      beforeSelect: function (startX, endX, startY, endY) {
+        return true;
+      },
+      afterSelect: function (startX, endX, startY, endY, datasets) {},
+    },
+  };
 
-	var Chart__default = /*#__PURE__*/_interopDefaultLegacy(Chart);
+  function getOption(chart, category, name) {
+    return helpers.valueOrDefault(
+      chart.options.plugins.boxselect[category]
+        ? chart.options.plugins.boxselect[category][name]
+        : undefined,
+      defaultOptions[category][name]
+    );
+  }
 
-	var defaultOptions = {
-		select: {
-			enabled: true,
-			direction: 'xy',
-			selectboxBackgroundColor: 'rgba(66,133,244,0.2)',
-			selectboxBorderColor: '#48F',
-		},
-		callbacks: {
-			beforeSelect: function (startX, endX, startY, endY) {
-				return true;
-			},
-			afterSelect: function (startX, endX, startY, endY, datasets) {
-			}
-		}
-	};
+  function getXScale(chart) {
+    return chart.data.datasets.length
+      ? chart.scales[chart.getDatasetMeta(0).xAxisID]
+      : null;
+  }
+  function getYScale(chart) {
+    return chart.scales[chart.getDatasetMeta(0).yAxisID];
+  }
 
-	function getOption(chart, category, name) {
-		return Chart__default['default'].helpers.getValueOrDefault(chart.options.plugins.boxselect[category] ? chart.options.plugins.boxselect[category][name] : undefined, defaultOptions[category][name]);
-	}
+  function doSelect(chart, startX, endX, startY, endY) {
+    // swap start/end if user dragged from right to left
+    if (startX > endX) {
+      var tmp = startX;
+      startX = endX;
+      endX = tmp;
+    }
+    if (startY > endY) {
+      var tmp = startY;
+      startY = endY;
+      endY = tmp;
+    }
 
+    // notify delegate
+    var beforeSelectCallback = helpers.valueOrDefault(
+      chart.options.plugins.boxselect.callbacks
+        ? chart.options.plugins.boxselect.callbacks.beforeSelect
+        : undefined,
+      defaultOptions.callbacks.beforeSelect
+    );
 
-	function getXScale(chart) {
-		return chart.data.datasets.length ? chart.scales[chart.getDatasetMeta(0).xAxisID] : null;
-	}
-	function getYScale(chart) {
-		return chart.scales[chart.getDatasetMeta(0).yAxisID];
-	}
+    if (!beforeSelectCallback(startX, endX, startY, endY)) {
+      return false;
+    }
 
+    var datasets = [];
+    // filter dataset
+    for (
+      var datasetIndex = 0;
+      datasetIndex < chart.data.datasets.length;
+      datasetIndex++
+    ) {
+      const sourceDataset = chart.data.datasets[datasetIndex];
 
-	function doSelect(chart, startX, endX, startY, endY) {
-		// swap start/end if user dragged from right to left
-		if (startX > endX) {
-			var tmp = startX;
-			startX = endX;
-			endX = tmp;
-		}
-		if (startY > endY) {
-			var tmp = startY;
-			startY = endY;
-			endY = tmp;
-		}
+      var selectedDataset = {
+        data: [],
+        indexes: [],
+      };
+      // if the dataset has labels, get them too
+      if (sourceDataset.labels) {
+        selectedDataset.labels = [];
+      }
 
-		// notify delegate
-		var beforeSelectCallback = Chart__default['default'].helpers.getValueOrDefault(chart.options.plugins.boxselect.callbacks ? chart.options.plugins.boxselect.callbacks.beforeSelect : undefined, defaultOptions.callbacks.beforeSelect);
+      // iterate data points
+      for (
+        var dataIndex = 0;
+        dataIndex < sourceDataset.data.length;
+        dataIndex++
+      ) {
+        var dataPoint = sourceDataset.data[dataIndex];
+        let inX = true;
+        if (startX == null) ; else {
+          inX = dataPoint.x >= startX && dataPoint.x <= endX;
+        }
+        let inY = true;
+        if (startY == null) ; else {
+          inY = dataPoint.y >= startY && dataPoint.y <= endY;
+        }
 
-		if (!beforeSelectCallback(startX, endX, startY, endY)) {
-			return false;
-		}
+        if (inX && inY) {
+          selectedDataset.data.push({ ...dataPoint });
+          selectedDataset.indexes.push(dataIndex);
+          if (selectedDataset.labels) {
+            selectedDataset.labels.push(sourceDataset.labels[dataIndex]);
+          }
+        }
+      }
+      datasets.push(selectedDataset);
+    }
 
-		var datasets = [];
-		// filter dataset
-		for (var datasetIndex = 0; datasetIndex < chart.data.datasets.length; datasetIndex++) {
-			const sourceDataset = chart.data.datasets[datasetIndex];
+    chart.boxselect.start = startX;
+    chart.boxselect.end = endX;
 
-			var selectedDataset = {
-				data: [],
-				indexes: []
-			};
-			// if the dataset has labels, get them too
-			if (sourceDataset.labels) {
-				selectedDataset.labels = [];
-			}
+    // chart.update();
 
-			// iterate data points
-			for (var dataIndex = 0; dataIndex < sourceDataset.data.length; dataIndex++) {
+    var afterSelectCallback = getOption(chart, "callbacks", "afterSelect");
+    afterSelectCallback(startX, endX, startY, endY, datasets);
+  }
 
-				var dataPoint = sourceDataset.data[dataIndex];
-				let inX = true;
-				if (startX == null) ; else {
-					inX = (dataPoint.x >= startX && dataPoint.x <= endX);
-				}
-				let inY = true;
-				if (startY == null) ; else {
-					inY = (dataPoint.y >= startY && dataPoint.y <= endY);
-				}
+  function drawSelectbox(chart) {
+    var borderColor = getOption(chart, "select", "selectboxBorderColor");
+    var fillColor = getOption(chart, "select", "selectboxBackgroundColor");
+    var direction = getOption(chart, "select", "direction");
 
-				if (inX && inY) {
-					selectedDataset.data.push({ ...dataPoint });
-					selectedDataset.indexes.push(dataIndex);
-					if (selectedDataset.labels) {
-						selectedDataset.labels.push(sourceDataset.labels[dataIndex]);
-					}
-				}
-			}
-			datasets.push(selectedDataset);
-		}
+    chart.ctx.beginPath();
+    // if direction == xy, rectangle
+    // if direction == x, horizontal selection only
+    // if direction == y, vertical selection only
+    let xStart = chart.boxselect.dragStartX;
+    let yStart = chart.boxselect.dragStartY;
+    let xSize = chart.boxselect.x - chart.boxselect.dragStartX;
+    let ySize = chart.boxselect.y - chart.boxselect.dragStartY;
+    if (direction == "x") {
+      var yScale = getYScale(chart);
+      yStart = yScale.getPixelForValue(yScale.max);
+      ySize =
+        yScale.getPixelForValue(yScale.min) - yScale.getPixelForValue(yScale.max);
+    } else if (direction == "y") {
+      var xScale = getXScale(chart);
+      xStart = xScale.getPixelForValue(xScale.max);
+      xSize =
+        xScale.getPixelForValue(xScale.min) - xScale.getPixelForValue(xScale.max);
+    }
+    // x y width height
+    chart.ctx.rect(xStart, yStart, xSize, ySize);
+    chart.ctx.lineWidth = 1;
+    chart.ctx.strokeStyle = borderColor;
+    chart.ctx.fillStyle = fillColor;
+    chart.ctx.fill();
+    chart.ctx.fillStyle = "";
+    chart.ctx.stroke();
+    chart.ctx.closePath();
+  }
 
-		chart.boxselect.start = startX;
-		chart.boxselect.end = endX;
+  var boxselectPlugin = {
+    id: "boxselect",
 
-		// chart.update();
+    afterInit: function (chart) {
+      if (chart.config.options.scales.x.length == 0) {
+        return;
+      }
 
-		var afterSelectCallback = getOption(chart, 'callbacks', 'afterSelect');
-		afterSelectCallback(startX, endX, startY, endY, datasets);
-	}
+      if (chart.options.plugins.boxselect === undefined) {
+        chart.options.plugins.boxselect = defaultOptions;
+      }
 
-	function drawSelectbox(chart) {
+      chart.boxselect = {
+        enabled: false,
+        x: null,
+        y: null,
+        dragStarted: false,
+        dragStartX: null,
+        dragEndX: null,
+        dragStartY: null,
+        dragEndY: null,
+        suppressTooltips: false,
+      };
+    },
 
-		var borderColor = getOption(chart, 'select', 'selectboxBorderColor');
-		var fillColor = getOption(chart, 'select', 'selectboxBackgroundColor');
-		var direction = getOption(chart, 'select', 'direction');
+    afterEvent: function (chart, event) {
+      let e = event.event;
+      var chartType = chart.config.type;
+      if (chartType !== "scatter" && chartType !== "line") return;
 
-		chart.ctx.beginPath();
-		// if direction == xy, rectangle
-		// if direction == x, horizontal selection only
-		// if direction == y, vertical selection only
-		let xStart = chart.boxselect.dragStartX;
-		let yStart = chart.boxselect.dragStartY;
-		let xSize = chart.boxselect.x - chart.boxselect.dragStartX;
-		let ySize = chart.boxselect.y - chart.boxselect.dragStartY;
-		if (direction == 'x') {
-			var yScale = getYScale(chart);
-			yStart = yScale.getPixelForValue(yScale.max);
-			ySize = yScale.getPixelForValue(yScale.min) - yScale.getPixelForValue(yScale.max);
-		} else if (direction == 'y') {
-			var xScale = getXScale(chart);
-			xStart = xScale.getPixelForValue(xScale.max);
-			xSize = xScale.getPixelForValue(xScale.min) - xScale.getPixelForValue(xScale.max);
-		}
-		// x y width height
-		chart.ctx.rect(xStart, yStart, xSize, ySize);
-		chart.ctx.lineWidth = 1;
-		chart.ctx.strokeStyle = borderColor;
-		chart.ctx.fillStyle = fillColor;
-		chart.ctx.fill();
-		chart.ctx.fillStyle = '';
-		chart.ctx.stroke();
-		chart.ctx.closePath();
-	}
+      var buttons =
+        e.native.buttons === undefined ? e.native.which : e.native.buttons;
+      if (e.native.type === "mouseup") {
+        buttons = 0;
+      }
+      chart.boxselect.enabled = true;
 
-	var boxselectPlugin = {
+      // handle drag to select
+      var selectEnabled = getOption(chart, "select", "enabled");
 
-		id: 'boxselect',
+      if (buttons === 1 && !chart.boxselect.dragStarted && selectEnabled) {
+        chart.boxselect.dragStartX = e.x;
+        chart.boxselect.dragStartY = e.y;
+        chart.boxselect.dragStarted = true;
+      }
 
-		afterInit: function (chart) {
+      // handle drag to select
+      if (chart.boxselect.dragStarted && buttons === 0) {
+        chart.boxselect.dragStarted = false;
 
-			if (chart.config.options.scales.xAxes.length == 0) {
-				return
-			}
+        var direction = getOption(chart, "select", "direction");
+        // if direction == xy, rectangle
+        // if direction == x, horizontal selection only
+        // if direction == y, vertical selection only
 
-			if (chart.options.plugins.boxselect === undefined) {
-				chart.options.plugins.boxselect = defaultOptions;
-			}
+        var xScale = getXScale(chart);
+        var yScale = getYScale(chart);
+        var startX = xScale.getValueForPixel(chart.boxselect.dragStartX);
+        var endX = xScale.getValueForPixel(chart.boxselect.x);
+        var startY = yScale.getValueForPixel(chart.boxselect.dragStartY);
+        var endY = yScale.getValueForPixel(chart.boxselect.y);
+        if (direction == "x") {
+          startY = null;
+          endY = null;
+        } else if (direction == "y") {
+          startX = null;
+          endX = null;
+        }
 
-			chart.boxselect = {
-				enabled: false,
-				x: null,
-				y: null,
-				dragStarted: false,
-				dragStartX: null,
-				dragEndX: null,
-				dragStartY: null,
-				dragEndY: null,
-				suppressTooltips: false,
-			};
+        if (
+          Math.abs(chart.boxselect.dragStartX - chart.boxselect.x) > 1 &&
+          Math.abs(chart.boxselect.dragStartY - chart.boxselect.y) > 1
+        ) {
+          doSelect(chart, startX, endX, startY, endY);
+        }
+      }
 
-		},
+      chart.boxselect.x = e.x;
+      chart.boxselect.y = e.y;
 
-		afterEvent: function (chart, e) {
+      chart.draw();
+    },
 
-			var chartType = chart.config.type;
-			if (chartType !== 'scatter' && chartType !== 'line') return;
+    afterDraw: function (chart) {
+      if (!chart.boxselect.enabled) {
+        return;
+      }
 
-			// fix for Safari
-			var buttons = (e.native.buttons === undefined ? e.native.which : e.native.buttons);
-			if (e.native.type === 'mouseup') {
-				buttons = 0;
-			}
+      if (chart.boxselect.dragStarted) {
+        drawSelectbox(chart);
+      }
 
-			chart.boxselect.enabled = true;
+      return true;
+    },
 
-			// handle drag to select
-			var selectEnabled = getOption(chart, 'select', 'enabled');
+    beforeTooltipDraw: function (chart) {
+      // suppress tooltips on dragging
+      return !chart.boxselect.dragStarted && !chart.boxselect.suppressTooltips;
+    },
+  };
 
-			if (buttons === 1 && !chart.boxselect.dragStarted && selectEnabled) {
-				chart.boxselect.dragStartX = e.x;
-				chart.boxselect.dragStartY = e.y;
-				chart.boxselect.dragStarted = true;
-			}
-
-			// handle drag to select
-			if (chart.boxselect.dragStarted && buttons === 0) {
-				chart.boxselect.dragStarted = false;
-
-				var direction = getOption(chart, 'select', 'direction');
-				// if direction == xy, rectangle
-				// if direction == x, horizontal selection only
-				// if direction == y, vertical selection only
-
-				var xScale = getXScale(chart);
-				var yScale = getYScale(chart);
-				var startX = xScale.getValueForPixel(chart.boxselect.dragStartX);
-				var endX = xScale.getValueForPixel(chart.boxselect.x);
-				var startY = yScale.getValueForPixel(chart.boxselect.dragStartY);
-				var endY = yScale.getValueForPixel(chart.boxselect.y);
-				if (direction == 'x') {
-					startY = null;
-					endY = null;
-				} else if (direction == 'y') {
-					startX = null;
-					endX = null;
-				}
-
-				if (Math.abs(chart.boxselect.dragStartX - chart.boxselect.x) > 1 && Math.abs(chart.boxselect.dragStartY - chart.boxselect.y) > 1) {
-					doSelect(chart, startX, endX, startY, endY);
-				}
-			}
-
-			chart.boxselect.x = e.x;
-			chart.boxselect.y = e.y;
-
-			chart.draw();
-		},
-
-		afterDraw: function (chart) {
-
-			if (!chart.boxselect.enabled) {
-				return;
-			}
-
-			if (chart.boxselect.dragStarted) {
-				drawSelectbox(chart);
-			}
-
-			return true;
-		},
-
-		beforeTooltipDraw: function (chart) {
-			// suppress tooltips on dragging
-			return !chart.boxselect.dragStarted && !chart.boxselect.suppressTooltips;
-		},
-
-	};
-
-	Chart__default['default'].plugins.register(boxselectPlugin);
-
-	return boxselectPlugin;
+  return boxselectPlugin;
 
 })));

@@ -1,4 +1,4 @@
-import Chart from "chart.js";
+import { valueOrDefault } from "chart.js/helpers";
 
 var defaultOptions = {
   select: {
@@ -16,7 +16,7 @@ var defaultOptions = {
 };
 
 function getOption(chart, category, name) {
-  return Chart.helpers.getValueOrDefault(
+  return valueOrDefault(
     chart.options.plugins.boxselect[category]
       ? chart.options.plugins.boxselect[category][name]
       : undefined,
@@ -47,7 +47,7 @@ function doSelect(chart, startX, endX, startY, endY) {
   }
 
   // notify delegate
-  var beforeSelectCallback = Chart.helpers.getValueOrDefault(
+  var beforeSelectCallback = valueOrDefault(
     chart.options.plugins.boxselect.callbacks
       ? chart.options.plugins.boxselect.callbacks.beforeSelect
       : undefined,
@@ -158,7 +158,7 @@ var boxselectPlugin = {
   id: "boxselect",
 
   afterInit: function (chart) {
-    if (chart.config.options.scales.xAxes.length == 0) {
+    if (chart.config.options.scales.x.length == 0) {
       return;
     }
 
@@ -179,19 +179,16 @@ var boxselectPlugin = {
     };
   },
 
-  afterEvent: function (chart, e) {
+  afterEvent: function (chart, event) {
+    let e = event.event;
     var chartType = chart.config.type;
     if (chartType !== "scatter" && chartType !== "line") return;
 
-    // fix for Safari
-    if (e.native) {
-      var buttons =
-        e.native.buttons === undefined ? e.native.which : e.native.buttons;
-      if (e.native.type === "mouseup") {
-        buttons = 0;
-      }
+    var buttons =
+      e.native.buttons === undefined ? e.native.which : e.native.buttons;
+    if (e.native.type === "mouseup") {
+      buttons = 0;
     }
-
     chart.boxselect.enabled = true;
 
     // handle drag to select
