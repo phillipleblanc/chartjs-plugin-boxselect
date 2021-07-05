@@ -258,5 +258,4 @@ var boxselectPlugin = {
   },
 };
 
-Chart.plugins.register(boxselectPlugin);
 export default boxselectPlugin;
