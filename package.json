@@ -1,6 +1,6 @@
 {
-  "name": "chartjs-plugin-boxselect",
-  "version": "1.0.6",
+  "name": "@phillipleblanc/chartjs-plugin-boxselect",
+  "version": "1.0.6-dev01",
   "description": "Chart.js plugin to select points on a chart with a click-and-drag box",
   "author": "Thomas Humphries",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "dist/chartjs-plugin-boxselect.js"
   ],
   "dependencies": {
-    "chart.js": "^2.9.4"
+    "chart.js": "^3.4.1"
   },
   "repository": {
     "type": "git",
